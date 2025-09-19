@@ -27,6 +27,20 @@ def parse_created_dt(dt_str: str | None):
 async def root():
     return {"ok": True}
 
+
+@router.get("/health")
+async def health_check():
+    conn = None
+    try:
+        conn = await get_conn()
+        await conn.execute("SELECT 1")
+        return {"status": "ok"}
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    finally:
+        if conn is not None:
+            await release_conn(conn)
+
 # -------- PlayWallet balance proxy (для удобной проверки из браузера) --------
 @router.get("/balance")
 async def balance_route():

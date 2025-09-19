@@ -163,7 +163,7 @@ services:
     container_name: playwallet_app_v2
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8001:8000"  # Новый порт
+      - "127.0.0.1:8000:8000"  # Новый порт
     depends_on:
       db:
         condition: service_healthy
@@ -368,7 +368,7 @@ setup_nginx_proxy() {
     cat > /etc/nginx/sites-available/playwallet-v2 <<EOF
 # Временный конфиг для тестирования v2
 upstream backend_v2 {
-    server 127.0.0.1:8001;
+    server 127.0.0.1:8000;
 }
 
 server {
@@ -421,16 +421,14 @@ case "\${1:-v2}" in
         echo "Переключение на v1..."
         cd $OLD_DIR && docker-compose up -d
         cd $NEW_DIR && docker-compose down
-        # Обновляем Nginx на старый порт
-        sed -i 's/127.0.0.1:8001/127.0.0.1:8000/' /etc/nginx/sites-available/playwallet-v2
+        # Убеждаемся, что Nginx указывает на порт 8000 (порт v1)
         systemctl reload nginx
         ;;
     "v2")
         echo "Переключение на v2..."
         cd $OLD_DIR && docker-compose down
         cd $NEW_DIR && docker-compose up -d
-        # Обновляем Nginx на новый порт
-        sed -i 's/127.0.0.1:8000/127.0.0.1:8001/' /etc/nginx/sites-available/playwallet-v2
+        # Убеждаемся, что Nginx указывает на порт 8000 (порт v2)
         systemctl reload nginx
         ;;
     *)
@@ -451,7 +449,7 @@ docker-compose ps
 
 # Проверка API
 echo -e "\nПроверка API:"
-curl -s http://localhost:8001/health | jq . 2>/dev/null || echo "API недоступно"
+curl -s http://localhost:8000/health | jq . 2>/dev/null || echo "API недоступно"
 
 # Проверка БД
 echo -e "\nПроверка БД:"
