@@ -1,27 +1,13 @@
-"""
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
 rule_files:
-  - "alert_rules.yml"
+  - alert_rules.yml
 
 scrape_configs:
-  - job_name: 'playwallet-app'
+  - job_name: playwallet-app
     static_configs:
       - targets: ['app:8000']
-    metrics_path: '/metrics'
+    metrics_path: /metrics
     scrape_interval: 10s
-
-  - job_name: 'postgres'
-    static_configs:
-      - targets: ['postgres_exporter:9187']
-
-  - job_name: 'redis'
-    static_configs:
-      - targets: ['redis_exporter:9121']
-
-  - job_name: 'node'
-    static_configs:
-      - targets: ['node_exporter:9100']
-"""
