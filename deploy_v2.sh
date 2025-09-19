@@ -11,7 +11,17 @@ cd /opt/playwallet && sudo docker-compose down
 
 # 2. СОЗДАНИЕ НОВОЙ СТРУКТУРЫ
 echo "Шаг 2: Создание структуры v2..."
-sudo mkdir -p /opt/playwallet-v2/{app,sql,nginx,monitoring/{prometheus,grafana},scripts,logs,backups,tests}
+sudo mkdir -p \
+    /opt/playwallet-v2/app \
+    /opt/playwallet-v2/sql \
+    /opt/playwallet-v2/nginx \
+    /opt/playwallet-v2/monitoring/prometheus \
+    /opt/playwallet-v2/monitoring/grafana/datasources \
+    /opt/playwallet-v2/monitoring/grafana/dashboards \
+    /opt/playwallet-v2/scripts \
+    /opt/playwallet-v2/logs \
+    /opt/playwallet-v2/backups \
+    /opt/playwallet-v2/tests
 
 # 3. КОПИРОВАНИЕ БАЗОВЫХ ФАЙЛОВ
 echo "Шаг 3: Копирование конфигураций..."
@@ -25,16 +35,21 @@ echo "Шаг 4: Создание улучшенных файлов..."
 
 # app/main.py
 sudo tee app/main.py > /dev/null <<'EOF'
-from fastapi import FastAPI
-from contextlib import asynccontextmanager
-from .db import init_pool, close_pool
-from .routes import router
 import logging
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+
+from app.db import close_pool, init_pool
+from app.metrics import MetricsMiddleware, router as metrics_router
+from app.routes import router as api_router
+
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s | %(levelname)-7s | %(name)s:%(lineno)d - %(message)s"
+    format="%(asctime)s | %(levelname)-7s | %(name)s:%(lineno)d - %(message)s",
 )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -44,16 +59,87 @@ async def lifespan(app: FastAPI):
     await close_pool()
     print("🛑 PlayWallet stopped")
 
+
 app = FastAPI(
     title="PlayWallet API v2.0",
     description="Автоматическое пополнение Steam с защитой от мошенничества",
     version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
-app.include_router(router)
+app.add_middleware(MetricsMiddleware)
+app.include_router(metrics_router)
+app.include_router(api_router)
+EOF
+
+sudo tee app/metrics.py > /dev/null <<'EOF'
+from __future__ import annotations
+
+import time
+
+from fastapi import APIRouter, Response
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+
+
+REQUEST_COUNT = Counter(
+    "http_requests_total",
+    "Total HTTP requests",
+    labelnames=("method", "path", "status"),
+)
+
+REQUEST_LATENCY = Histogram(
+    "http_request_duration_seconds",
+    "HTTP request latency in seconds",
+    labelnames=("method", "path", "status"),
+    buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0),
+)
+
+
+class MetricsMiddleware:
+    """Collect Prometheus metrics for each HTTP request."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        method = scope.get("method", "").upper()
+        path = scope.get("path", "")
+        if not path:
+            raw_path = scope.get("raw_path")
+            if isinstance(raw_path, (bytes, bytearray)):
+                path = raw_path.decode("latin-1")
+
+        start_time = time.perf_counter()
+        status_code: int | None = None
+
+        async def send_wrapper(message):
+            nonlocal status_code
+            if message["type"] == "http.response.start":
+                status_code = message["status"]
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_wrapper)
+        finally:
+            duration = time.perf_counter() - start_time
+            status = str(status_code or 500)
+            REQUEST_COUNT.labels(method=method, path=path, status=status).inc()
+            REQUEST_LATENCY.labels(method=method, path=path, status=status).observe(duration)
+
+
+router = APIRouter()
+
+
+@router.get("/metrics", include_in_schema=False)
+async def metrics_endpoint() -> Response:
+    data = generate_latest()
+    return Response(content=data, media_type=CONTENT_TYPE_LATEST)
 EOF
 
 # app/fraud_detection.py (минимальная версия для начала)
@@ -124,10 +210,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 EOF
 
-# docker-compose.yml (упрощенный для быстрого старта)
+# docker-compose.yml (приложение + мониторинг)
 sudo tee docker-compose.yml > /dev/null <<'EOF'
-version: '3.8'
-
 services:
   db:
     image: postgres:15-alpine
@@ -178,8 +262,145 @@ services:
     volumes:
       - ./logs:/app/logs
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: playwallet_prometheus
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus_data:/prometheus
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: playwallet_grafana
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+    depends_on:
+      - prometheus
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+
 volumes:
   pgdata_v2:
+  prometheus_data:
+  grafana_data:
+EOF
+
+sudo tee monitoring/prometheus/prometheus.yml > /dev/null <<'EOF'
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - alert_rules.yml
+
+scrape_configs:
+  - job_name: playwallet-app
+    static_configs:
+      - targets: ['app:8000']
+    metrics_path: /metrics
+    scrape_interval: 10s
+EOF
+
+sudo tee monitoring/prometheus/alert_rules.yml > /dev/null <<'EOF'
+# Example alerting rules. Adjust thresholds to your production needs.
+---
+groups:
+  - name: playwallet-alerts
+    rules:
+      - alert: PlayWalletAppDown
+        expr: up{job="playwallet-app"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: PlayWallet API is down
+          description: Prometheus has not scraped the FastAPI service successfully for 2 minutes.
+EOF
+
+sudo tee monitoring/grafana/datasources/datasource.yml > /dev/null <<'EOF'
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+EOF
+
+sudo tee monitoring/grafana/dashboards/dashboards.yml > /dev/null <<'EOF'
+apiVersion: 1
+providers:
+  - name: PlayWallet Dashboards
+    folder: PlayWallet
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+EOF
+
+sudo tee monitoring/grafana/dashboards/playwallet-overview.json > /dev/null <<'EOF'
+{
+  "id": null,
+  "uid": "playwallet-overview",
+  "title": "PlayWallet Overview",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Requests per minute",
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total[1m]))",
+          "legendFormat": "req/min"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["sum"], "fields": "" },
+        "orientation": "horizontal",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Request latency",
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    }
+  ],
+  "templating": { "list": [] }
+}
 EOF
 
 # 5. КОПИРОВАНИЕ ОСТАЛЬНЫХ ФАЙЛОВ ПРИЛОЖЕНИЯ

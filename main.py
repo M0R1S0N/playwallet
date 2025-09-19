@@ -9,6 +9,7 @@ from app.routes import router as api_router
 from app.routes import router
 
 
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-7s | %(name)s:%(lineno)d - %(message)s",
@@ -37,3 +38,4 @@ app.add_middleware(MetricsMiddleware)
 app.include_router(metrics_router)
 app.include_router(api_router)
 app.include_router(router)
+
