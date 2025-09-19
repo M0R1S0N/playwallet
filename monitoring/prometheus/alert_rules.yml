@@ -1,0 +1,13 @@
+# Example alerting rules. Adjust thresholds to your production needs.
+---
+groups:
+  - name: playwallet-alerts
+    rules:
+      - alert: PlayWalletAppDown
+        expr: up{job="playwallet-app"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: PlayWallet API is down
+          description: Prometheus has not scraped the FastAPI service successfully for 2 minutes.
