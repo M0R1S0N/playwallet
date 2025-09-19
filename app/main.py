@@ -1,8 +1,11 @@
-from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from .db import init_pool, close_pool
-from .routes import router
 import logging
+
+from fastapi import FastAPI
+
+from .db import init_pool, close_pool
+from .metrics import MetricsMiddleware, router as metrics_router
+from .routes import router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,7 +26,9 @@ app = FastAPI(
     version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
+app.add_middleware(MetricsMiddleware)
+app.include_router(metrics_router)
 app.include_router(router)
