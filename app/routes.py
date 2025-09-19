@@ -1,10 +1,10 @@
-from fastapi import HTTPException, APIRouter, Request, Query
+from fastapi import HTTPException, APIRouter, Request, Query, Response, status
 import os, uuid, math, traceback, time, hashlib
 from datetime import datetime
 import httpx
 
 from .services import get_balance, create_order, pay_order, get_usd_rate
-from .db import get_conn, release_conn, insert_order, update_order_status
+from .db import get_conn, release_conn, insert_order, update_order_status, ping
 from .telegram_utils import notify
 from .config import DEFAULT_SERVICE_ID, COMMISSION_RATE, MIN_SEND_USD
 
@@ -28,18 +28,19 @@ async def root():
     return {"ok": True}
 
 
-@router.get("/health")
+@router.get("/health", include_in_schema=False)
 async def health_check():
-    conn = None
     try:
-        conn = await get_conn()
-        await conn.execute("SELECT 1")
-        return {"status": "ok"}
+        await ping()
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
-    finally:
-        if conn is not None:
-            await release_conn(conn)
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
+    return {"status": "ok"}
+
+
+@router.head("/health", include_in_schema=False)
+async def health_check_head():
+    await health_check()
+    return Response(status_code=status.HTTP_200_OK)
 
 # -------- PlayWallet balance proxy (для удобной проверки из браузера) --------
 @router.get("/balance")
