@@ -32,9 +32,9 @@ echo "Ожидание готовности сервисов..."
 sleep 30
 
 # Проверяем статус
-if curl -f http://localhost:8001/health > /dev/null 2>&1; then
+if curl -f http://localhost:8000/health > /dev/null 2>&1; then
     echo "✅ Сервис запущен успешно!"
-    echo "🌐 API: http://localhost:8001"
+    echo "🌐 API: http://localhost:8000"
     echo "📊 Grafana: http://localhost:3000"
     echo "📈 Prometheus: http://localhost:9090"
     echo "📖 Docs: https://$DOMAIN/docs"
