@@ -27,12 +27,28 @@ async def close_pool():
 
 async def get_conn():
     """Получить соединение из пула"""
+    if pool is None:
+        raise RuntimeError("Connection pool has not been initialised")
     return await pool.acquire()
 
 
 async def release_conn(conn):
     """Вернуть соединение в пул"""
+    if pool is None:
+        return
     await pool.release(conn)
+
+
+async def ping() -> None:
+    """Проверить доступность базы данных."""
+
+    conn = None
+    try:
+        conn = await get_conn()
+        await conn.execute("SELECT 1")
+    finally:
+        if conn is not None:
+            await release_conn(conn)
 
 
 async def insert_order(conn, **kwargs):
