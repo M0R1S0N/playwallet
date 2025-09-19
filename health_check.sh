@@ -5,7 +5,7 @@ echo "Статус контейнеров:"
 docker-compose ps
 
 echo -e "\nПроверка API:"
-curl -s http://localhost:8001/health | head -n 5
+curl -s http://localhost:8000/health | head -n 5
 
 echo -e "\nПроверка БД:"
 docker exec playwallet_db_v2 pg_isready -U postgres 2>/dev/null && echo "БД OK" || echo "БД недоступна"

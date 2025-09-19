@@ -153,7 +153,7 @@ services:
     container_name: playwallet_app_v2
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8001:8000"
+      - "127.0.0.1:8000:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -229,7 +229,7 @@ echo "Статус контейнеров:"
 docker-compose ps
 
 echo -e "\nПроверка API:"
-curl -s http://localhost:8001/health | head -n 5
+curl -s http://localhost:8000/health | head -n 5
 
 echo -e "\nПроверка БД:"
 docker exec playwallet_db_v2 pg_isready -U postgres 2>/dev/null && echo "БД OK" || echo "БД недоступна"
@@ -270,11 +270,11 @@ sudo docker-compose up -d
 echo "Шаг 9: Проверка работоспособности..."
 sleep 30
 
-if curl -f http://localhost:8001/health > /dev/null 2>&1; then
+if curl -f http://localhost:8000/health > /dev/null 2>&1; then
     echo "✅ PlayWallet v2 запущен успешно!"
     echo ""
     echo "📋 ИНФОРМАЦИЯ О СИСТЕМЕ:"
-    echo "• Основной API: http://localhost:8001"
+    echo "• Основной API: http://localhost:8000"
     echo "• База данных: localhost:5433"
     echo "• Документация: https://arieco.shop/docs (после обновления Nginx)"
     echo "• Логи: /opt/playwallet-v2/logs/"
@@ -286,9 +286,9 @@ if curl -f http://localhost:8001/health > /dev/null 2>&1; then
     echo "• Рестарт: docker-compose restart"
     echo ""
     echo "⚠️ СЛЕДУЮЩИЕ ШАГИ:"
-    echo "1. Протестируйте API: curl http://localhost:8001/balance"
-    echo "2. Проверьте admin статистику: curl 'http://localhost:8001/admin/stats?secret=topup123super'"
-    echo "3. Обновите Nginx для перенаправления на порт 8001"
+    echo "1. Протестируйте API: curl http://localhost:8000/balance"
+    echo "2. Проверьте admin статистику: curl 'http://localhost:8000/admin/stats?secret=topup123super'"
+    echo "3. Убедитесь, что Nginx проксирует на порт 8000"
     echo "4. Сделайте тестовый платеж для проверки callback"
     echo ""
     echo "Резервная копия старой версии: /opt/playwallet-backup-*"
