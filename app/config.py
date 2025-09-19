@@ -10,11 +10,23 @@ PW_DEV_TOKEN = os.getenv("PW_DEV_TOKEN")
 PW_PROD_URL = os.getenv("PW_PROD_URL")
 PW_PROD_TOKEN = os.getenv("PW_PROD_TOKEN")
 
-DB_HOST = os.getenv("DB_HOST")
-DB_PORT = int(os.getenv("DB_PORT", 5432))
-DB_NAME = os.getenv("DB_NAME")
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
+def _get_env(name: str, default: str | None = None) -> str | None:
+    """Return environment variable value or fallback when missing/empty."""
+
+    value = os.getenv(name)
+    if value is None or value.strip() == "":
+        return default
+    return value
+
+
+DB_HOST = _get_env("DB_HOST", "db")
+try:
+    DB_PORT = int(_get_env("DB_PORT", "5432"))
+except ValueError:
+    DB_PORT = 5432
+DB_NAME = _get_env("DB_NAME")
+DB_USER = _get_env("DB_USER")
+DB_PASSWORD = _get_env("DB_PASSWORD")
 
 TG_BOT_TOKEN = os.getenv("TG_BOT_TOKEN")
 TG_CHAT_ID = os.getenv("TG_CHAT_ID")
