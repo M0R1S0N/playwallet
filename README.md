@@ -56,6 +56,7 @@ curl http://localhost:8000/metrics | head
 
 Через внешний домен метрики доступны на `https://arieco.shop/metrics` (эндпойнт отключён в OpenAPI, поэтому в Swagger его нет).
 
+
 Теперь любая команда `docker compose exec` корректно подставит `DB_USER` и `DB_NAME`:
 
 ```bash
