@@ -410,7 +410,7 @@ echo "Шаг 5: Копирование и адаптация файлов при
 sudo cp /opt/playwallet/app/config.py app/
 sudo cp /opt/playwallet/app/db.py app/
 sudo cp /opt/playwallet/app/services.py app/
-sudo cp /opt/playwallet/app/routes.py app/
+# В версии v2 используем обновлённые маршруты из репозитория
 sudo cp /opt/playwallet/app/telegram_utils.py app/
 sudo cp /opt/playwallet/app/auto_topup.py app/
 
