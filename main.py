@@ -7,6 +7,9 @@ from app.db import close_pool, init_pool
 from app.metrics import MetricsMiddleware, router as metrics_router
 from app.routes import router as api_router
 
+from app.routes import router
+
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,3 +38,8 @@ app = FastAPI(
 app.add_middleware(MetricsMiddleware)
 app.include_router(metrics_router)
 app.include_router(api_router)
+
+
+app.include_router(router)
+
+

@@ -56,6 +56,24 @@ curl http://localhost:8000/metrics | head
 
 Через внешний домен метрики доступны на `https://arieco.shop/metrics` (эндпойнт отключён в OpenAPI, поэтому в Swagger его нет).
 
+
+Теперь любая команда `docker compose exec` корректно подставит `DB_USER` и `DB_NAME`:
+
+```bash
+docker compose exec db psql -U "$DB_USER" -d "$DB_NAME" -c "SELECT * FROM orders LIMIT 5;"
+```
+
+Для быстрой вставки тестового заказа:
+
+```bash
+docker compose exec db psql -U "$DB_USER" -d "$DB_NAME" <<'SQL'
+INSERT INTO orders (id, external_id, login, service_id, amount, status, created_datetime)
+VALUES ('test-order-001', 'PLATI-TEST-001', 'test_login', 'ff71c998-14be-4e3d-8ad3-0ffc8357265b', 1.23, 'created', NOW())
+ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status
+RETURNING *;
+SQL
+```
+
 ## Скрипт миграции
 
 `deploy_v2.sh` автоматизирует развертывание новой версии из старой установки `/opt/playwallet`. Скопируйте его на сервер, сделайте исполняемым и запустите:
