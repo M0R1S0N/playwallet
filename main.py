@@ -1,13 +1,17 @@
-from fastapi import FastAPI
-from contextlib import asynccontextmanager
-from .db import init_pool, close_pool
-from .routes import router
 import logging
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+
+from app.db import close_pool, init_pool
+from app.routes import router
+
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s | %(levelname)-7s | %(name)s:%(lineno)d - %(message)s"
+    format="%(asctime)s | %(levelname)-7s | %(name)s:%(lineno)d - %(message)s",
 )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -17,13 +21,14 @@ async def lifespan(app: FastAPI):
     await close_pool()
     print("🛑 PlayWallet stopped")
 
+
 app = FastAPI(
     title="PlayWallet API v2.0",
     description="Автоматическое пополнение Steam с защитой от мошенничества",
     version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 app.include_router(router)
