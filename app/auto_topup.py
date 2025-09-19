@@ -1,4 +1,4 @@
-import os, time, hmac, json, httpx, hashlib, asyncio, logging
+import os, sys, time, hmac, json, httpx, hashlib, asyncio, logging
 from logging.handlers import RotatingFileHandler
 from dotenv import load_dotenv
 from telegram import Bot
@@ -30,16 +30,40 @@ DRY_RUN = os.getenv("TOPUP_DRY_RUN", "false").lower() == "true"
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
 # ---------- logging ----------
-os.makedirs("/app/logs", exist_ok=True)
+LOG_DIR = os.getenv("LOG_DIR", "/app/logs")
+LOG_PATH = os.path.join(LOG_DIR, "auto_topup.log")
+
 logger = logging.getLogger("auto_topup")
 logger.setLevel(LOG_LEVEL)
-fh = RotatingFileHandler("/app/logs/auto_topup.log", maxBytes=5_000_000, backupCount=5, encoding="utf-8")
-fh.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s", "%Y-%m-%d %H:%M:%S"))
-sh = logging.StreamHandler()
-sh.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s", "%Y-%m-%d %H:%M:%S"))
+
+handlers: list[logging.Handler] = []
+
+try:
+    os.makedirs(LOG_DIR, exist_ok=True)
+    file_handler = RotatingFileHandler(
+        LOG_PATH,
+        maxBytes=5_000_000,
+        backupCount=5,
+        encoding="utf-8",
+    )
+    file_handler.setFormatter(
+        logging.Formatter("%(asctime)s | %(levelname)s | %(message)s", "%Y-%m-%d %H:%M:%S")
+    )
+    handlers.append(file_handler)
+except (OSError, PermissionError) as exc:
+    sys.stderr.write(
+        f"[auto_topup] Unable to open log file '{LOG_PATH}': {exc}. Falling back to stdout only.\n"
+    )
+
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(
+    logging.Formatter("%(asctime)s | %(levelname)s | %(message)s", "%Y-%m-%d %H:%M:%S")
+)
+handlers.append(stream_handler)
+
 if not logger.handlers:
-    logger.addHandler(fh)
-    logger.addHandler(sh)
+    for handler in handlers:
+        logger.addHandler(handler)
 
 bot = Bot(token=TG_TOKEN)
 
