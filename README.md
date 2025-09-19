@@ -29,6 +29,33 @@ source .env
 set +a
 ```
 
+Теперь можно запускать `psql` внутри контейнера, даже если переменные окружения не экспортированы в текущую сессию:
+
+```bash
+docker compose exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT * FROM orders LIMIT 5;"'
+```
+
+Для быстрой вставки тестового заказа воспользуйтесь тем же приёмом:
+
+```bash
+docker compose exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" <<"SQL"\
+INSERT INTO orders (id, external_id, login, service_id, amount, status, created_datetime)\
+VALUES ("test-order-001", "PLATI-TEST-001", "test_login", "ff71c998-14be-4e3d-8ad3-0ffc8357265b", 1.23, "created", NOW())\
+ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status\
+RETURNING *;\
+SQL'
+```
+
+## Проверка метрик
+
+После запуска приложения убедитесь, что Prometheus может получить метрики напрямую:
+
+```bash
+curl http://localhost:8000/metrics | head
+```
+
+Через внешний домен метрики доступны на `https://arieco.shop/metrics` (эндпойнт отключён в OpenAPI, поэтому в Swagger его нет).
+
 Теперь любая команда `docker compose exec` корректно подставит `DB_USER` и `DB_NAME`:
 
 ```bash
