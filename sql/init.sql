@@ -1,7 +1,3 @@
-CREATE DATABASE playwallet;
-
-\c playwallet;
-
 CREATE TABLE IF NOT EXISTS orders (
     id TEXT PRIMARY KEY,           -- ID заказа в PlayWallet
     external_id TEXT,              -- внешний ID (Plati id/inv/код)
